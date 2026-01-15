@@ -2,6 +2,9 @@
 export http_proxy=http://127.0.0.1:10809
 export https_proxy=http://127.0.0.1:10809
 
+# git push
+ssh -T git@github-qzq
+git remote set-url origin git@github-qzq:ThePivotPoint/EmbeddingExplore.gi
 # TypeScript Repo -> CallGraph -> Function Pair 数据
 
 ## 0) 下载高星 TypeScript 仓库（可选）
