@@ -1,0 +1,15 @@
+{
+  "name": "tscompiler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "extract_callgraph.js",
+  "scripts": {
+    "extract": "node extract_callgraph.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "typescript": "^5.4.5"
+  }
+}
