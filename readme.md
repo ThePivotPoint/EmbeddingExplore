@@ -3,6 +3,35 @@ export http_proxy=http://127.0.0.1:10809
 export https_proxy=http://127.0.0.1:10809
 
 # TypeScript Repo -> CallGraph -> Function Pair 数据
+
+## 0) 下载高星 TypeScript 仓库（可选）
+使用 `download_ts_repos.py` 批量下载 GitHub 上的高星 TypeScript 仓库：
+
+```bash
+# 下载 100 个 star>500 的 TypeScript 仓库
+python embedding_pipeline/download_ts_repos.py --n-repos 100 --min-stars 500 --out-dir ./ts_repos --save-urls ./ts_repos.txt
+
+# 自定义筛选条件
+python embedding_pipeline/download_ts_repos.py \
+  --n-repos 50 \
+  --min-stars 1000 \
+  --created-after 2020-01-01 \
+  --max-size-kb 100000 \
+  --licenses mit apache-2.0 \
+  --skip-forks \
+  --skip-archived \
+  --out-dir ./high_quality_ts \
+  --save-urls ./high_quality_ts.txt
+```
+
+该脚本功能：
+- 自动查询 GitHub API 获取 TypeScript 仓库，按 star 数排序
+- 支持按 star 数、创建时间、仓库大小、许可证等条件筛选
+- 自动过滤 fork 和 archived 仓库
+- 并行克隆仓库，支持浅克隆节省空间
+- 保存仓库列表供后续使用
+- 支持 GitHub API 速率限制自动处理
+
 ## 1) 安装依赖
 `apt-get update -y && apt-get install -y nodejs`
 
