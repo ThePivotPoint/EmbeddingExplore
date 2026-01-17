@@ -1,49 +1,75 @@
+#!/usr/bin/env python3
+"""
+Build a function pair dataset from a directory of callgraphs.
+"""
+
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
-
-
-def run(project: str, callgraph_out: str, pairs_out: str, no_negative: bool) -> None:
-    repo_root = Path(__file__).resolve().parent
-    extractor = repo_root / "tscompiler" / "extract_callgraph.js"
-    callgraph = Path(callgraph_out)
-    callgraph.parent.mkdir(parents=True, exist_ok=True)
-
-    subprocess.check_call(
-        [
-            "node",
-            str(extractor),
-            "--project",
-            project,
-            "--out",
-            str(callgraph),
-        ]
-    )
-
-    cmd = [
-        sys.executable,
-        str(repo_root / "build_dataset_tscompiler.py"),
-        "--callgraph",
-        str(callgraph),
-        "--out",
-        pairs_out,
-    ]
-    if no_negative:
-        cmd.append("--no-negative")
-    subprocess.check_call(cmd)
-
+from tqdm import tqdm
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--project", required=True, help="TypeScript repo root")
-    ap.add_argument("--callgraph-out", required=True, help="Callgraph jsonl output path")
-    ap.add_argument("--pairs-out", required=True, help="Pairs jsonl output path")
-    ap.add_argument("--no-negative", action="store_true")
+    ap.add_argument(
+        "repos_dir",
+        type=Path,
+        help="Directory containing repositories with callgraph.jsonl files.",
+    )
+    ap.add_argument(
+        "--out",
+        type=Path,
+        required=True,
+        help="Output path for the combined pairs .jsonl file.",
+    )
+    ap.add_argument(
+        "--no-negative",
+        action="store_true",
+        help="Don't generate negative samples.",
+    )
     args = ap.parse_args()
-    run(args.project, args.callgraph_out, args.pairs_out, args.no_negative)
 
+    callgraph_files = list(args.repos_dir.glob("**/callgraph.jsonl"))
+    if not callgraph_files:
+        print(f"No callgraph.jsonl files found in {args.repos_dir}")
+        return
+
+    repo_root = Path(__file__).resolve().parent
+    builder_script = repo_root / "build_dataset_tscompiler.py"
+    
+    # Create a temporary file to store intermediate pair data
+    temp_output = args.out.with_suffix(".tmp")
+
+    with open(temp_output, "w", encoding="utf-8") as f_out:
+        for callgraph_file in tqdm(callgraph_files, desc="Processing callgraphs"):
+            cmd = [
+                sys.executable,
+                str(builder_script),
+                "--callgraph",
+                str(callgraph_file),
+                "--out",
+                "-",  # Write to stdout
+            ]
+            if args.no_negative:
+                cmd.append("--no-negative")
+            
+            try:
+                result = subprocess.run(
+                    cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                )
+                f_out.write(result.stdout)
+            except subprocess.CalledProcessError as e:
+                print(f"Error processing {callgraph_file.name}: {e.stderr}")
+
+    # Rename the temporary file to the final output file
+    temp_output.rename(args.out)
+
+    print(f"\nDataset successfully built at: {args.out}")
 
 if __name__ == "__main__":
     main()
-

@@ -133,8 +133,7 @@ def main() -> None:
     ap.add_argument("--no-negative", action="store_true", help="Do not emit negative samples")
     args = ap.parse_args()
 
-    count = build_pairs(args.callgraph, args.out, with_negative=not args.no_negative)
-    print(count)
+    build_pairs(args.callgraph, args.out, with_negative=not args.no_negative)
 
 
 if __name__ == "__main__":

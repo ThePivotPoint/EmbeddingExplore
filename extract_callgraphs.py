@@ -1,108 +1,71 @@
 #!/usr/bin/env python3
-"""
-Batch extract callgraphs from a directory of TypeScript repos.
-"""
-
 import argparse
-import json
 import os
 import subprocess
+import sys
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
+from multiprocessing import Pool
 from tqdm import tqdm
 
-def find_ts_repos(root_dir: Path) -> list[Path]:
-    """Find all directories that look like TypeScript repos."""
-    repos = []
-    for subdir in root_dir.iterdir():
-        if subdir.is_dir() and (subdir / "tsconfig.json").exists():
-            repos.append(subdir)
-    return repos
+def run_extractor(repo_dir: Path):
+    """
+    Run the callgraph extractor on a single repository.
+    """
+    repo_name = repo_dir.name
+    output_file = repo_dir / "callgraph.jsonl"
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    if output_file.exists():
+        return f"Skipping {repo_name}, callgraph.jsonl already exists."
 
-def run_extractor(repo_path: Path, extractor_script: Path, output_dir: Path) -> tuple[str, bool]:
-    """Run the callgraph extractor on a single repo."""
-    repo_name = repo_path.name
-    output_file = output_dir / f"{repo_name}.jsonl"
+    tscompiler_dir = Path(__file__).resolve().parent / "tscompiler"
+    extractor_script = tscompiler_dir / "extract_callgraph.js"
+
     cmd = [
         "node",
         str(extractor_script),
         "--project",
-        str(repo_path),
+        str(repo_dir),
         "--out",
         str(output_file),
     ]
+
+    print(f"Running command: {' '.join(cmd)}")
     try:
-        subprocess.run(
+        result = subprocess.run(
             cmd,
             check=True,
             capture_output=True,
             text=True,
-            timeout=300,  # 5-minute timeout
+            encoding="utf-8",
         )
-        return repo_name, True
+        print(f"Successfully processed {repo_name}")
+        return f"Successfully processed {repo_name}"
     except subprocess.CalledProcessError as e:
-        error_message = f"Error processing {repo_name}:\n{e.stderr}"
-        return error_message, False
-    except subprocess.TimeoutExpired:
-        return f"Timeout processing {repo_name}", False
+        print(f"Error processing {repo_name}: {e.stderr}")
+        return f"Error processing {repo_name}: {e.stderr}"
 
 def main() -> None:
-    repo_root = Path(__file__).resolve().parent
-    ap = argparse.ArgumentParser(description="Batch extract callgraphs from TypeScript repos.")
+    ap = argparse.ArgumentParser()
     ap.add_argument(
-        "--repos-dir",
+        "repo_dir",
         type=Path,
-        required=True,
-        help="Directory containing cloned TypeScript repositories.",
+        help="Directory containing TypeScript repositories.",
     )
     ap.add_argument(
-        "--out-dir",
-        type=Path,
-        required=True,
-        help="Output directory for callgraph .jsonl files.",
-    )
-    ap.add_argument(
-        "--extractor-script",
-        type=Path,
-        default=repo_root / "tscompiler" / "extract_callgraph.js",
-        help="Path to the callgraph extractor script.",
-    )
-    ap.add_argument(
-        "--max-workers",
+        "--workers",
         type=int,
         default=os.cpu_count(),
-        help="Number of parallel workers.",
+        help="Number of worker processes to use.",
     )
     args = ap.parse_args()
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    repos = [d for d in args.repo_dir.iterdir() if d.is_dir()]
+    
+    with Pool(args.workers) as pool:
+        results = list(tqdm(pool.imap(run_extractor, repos), total=len(repos), desc="Extracting callgraphs"))
 
-    repos = find_ts_repos(args.repos_dir)
-    if not repos:
-        print(f"No TypeScript repos found in {args.repos_dir}")
-        return
-
-    print(f"Found {len(repos)} TypeScript repos. Starting extraction...")
-
-    errors = []
-    with ThreadPoolExecutor(max_workers=args.max_workers) as executor:
-        futures = {
-            executor.submit(run_extractor, repo, args.extractor_script, args.out_dir): repo
-            for repo in repos
-        }
-        with tqdm(total=len(repos), desc="Extracting callgraphs") as pbar:
-            for future in as_completed(futures):
-                repo_name, success = future.result()
-                if not success:
-                    errors.append(repo_name)
-                pbar.update(1)
-
-    print("\nExtraction complete.")
-    if errors:
-        print(f"\nEncountered {len(errors)} errors:")
-        for error in errors:
-            print(error)
+    for result in results:
+        print(result)
 
 if __name__ == "__main__":
     main()
