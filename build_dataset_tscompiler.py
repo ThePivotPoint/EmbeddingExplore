@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 import random
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -76,7 +77,16 @@ def build_pairs(callgraph_jsonl: str, out_jsonl: str, with_negative: bool = True
 
     emitted = set()
     n = 0
-    with open(out_jsonl, "w", encoding="utf-8") as out:
+    out_f = None
+    if out_jsonl == "-":
+        out_f = sys.stdout
+    else:
+        out_dir = os.path.dirname(out_jsonl)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        out_f = open(out_jsonl, "w", encoding="utf-8")
+
+    with out_f as out:
         for row in rows:
             src_id = row["id"]
             src_fn = fns.get(src_id)
