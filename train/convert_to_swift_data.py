@@ -89,7 +89,7 @@ def main():
             # 转换为Swift格式
             swift_data = {
                 "messages": [{"role": "user", "content": QueryPrefix + query}],
-                "positive_messages": [{"role": "user", "content": data["positive"]}],
+                "positive_messages": [[{"role": "user", "content": data["positive"]}]],
             }
             f_out.write(json.dumps(swift_data, ensure_ascii=False) + "\n")
             lines_written += 1
