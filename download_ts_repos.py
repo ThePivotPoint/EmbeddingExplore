@@ -19,6 +19,10 @@ from typing import List, Optional
 import requests
 from tqdm import tqdm
 
+# 配置代理设置
+os.environ["http_proxy"] = "http://127.0.0.1:10809"
+os.environ["https_proxy"] = "http://127.0.0.1:10809"
+
 
 def get_github_token() -> Optional[str]:
     """Read GitHub token from config or env."""
@@ -33,7 +37,18 @@ def github_request(url: str, params: dict, token: Optional[str] = None) -> dict:
     headers = {"Accept": "application/vnd.github+json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    resp = requests.get(url, headers=headers, params=params, timeout=60)
+    
+    # 获取代理设置
+    proxies = {}
+    http_proxy = os.getenv("http_proxy") or os.getenv("HTTP_PROXY")
+    https_proxy = os.getenv("https_proxy") or os.getenv("HTTPS_PROXY")
+    
+    if http_proxy:
+        proxies["http"] = http_proxy
+    if https_proxy:
+        proxies["https"] = https_proxy
+    
+    resp = requests.get(url, headers=headers, params=params, timeout=60, proxies=proxies if proxies else None)
     if resp.status_code == 403 and "rate limit" in resp.text.lower():
         print("[WARN] GitHub API rate limit hit, sleeping 60s...")
         time.sleep(60)
@@ -148,8 +163,8 @@ def save_urls(urls: List[str], path: Path) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Download high-star TypeScript repositories")
     # new features
-    ap.add_argument("--n-repos", type=int, default=100, help="Number of repos to fetch (default 100)")
-    ap.add_argument("--min-stars", type=int, default=500, help="Minimum star count (default 500)")
+    ap.add_argument("--n-repos", type=int, default=200, help="Number of repos to fetch (default 100)")
+    ap.add_argument("--min-stars", type=int, default=1000, help="Minimum star count (default 500)")
     ap.add_argument("--created-after", default="2018-01-01", help="Created after date (default 2018-01-01)")
     ap.add_argument("--max-size-kb", type=int, default=50_000, help="Max repo size in KB (default 50MB)")
     ap.add_argument("--licenses", nargs="+", help="License filters (default: mit apache-2.0 bsd-3-clause bsd-2-clause)")
