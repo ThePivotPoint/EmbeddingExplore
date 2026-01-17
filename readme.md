@@ -9,7 +9,6 @@ git remote set-url origin git@github-qzq:ThePivotPoint/EmbeddingExplore.gi
 
 ## 0) 下载高星 TypeScript 仓库（可选）
 使用 `download_ts_repos.py` 批量下载 GitHub 上的高星 TypeScript 仓库：
-python download_ts_repos.py --n-repos 100 --min-stars 500 --out-dir ./ts_repos --save-urls ./ts_repos.txt
 ```bash
 # 下载 100 个 star>500 的 TypeScript 仓库
 python embedding_pipeline/download_ts_repos.py --n-repos 100 --min-stars 500 --out-dir ./ts_repos --save-urls ./ts_repos.txt
