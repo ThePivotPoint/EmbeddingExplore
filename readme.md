@@ -53,7 +53,7 @@ python embedding_pipeline/extract_callgraphs.py ./ts_repos
 最后，使用 `run_tscompiler_pipeline.py` 脚本将所有调用图合并成最终的数据集：
 
 ```bash
-python embedding_pipeline/run_tscompiler_pipeline.py --callgraphs-dir ./callgraphs --out ./dataset.jsonl
+python embedding_pipeline/run_tscompiler_pipeline.py ./ts_repos --out ./dataset.jsonl
 ```
 
-该脚本会自动处理 `--callgraphs-dir` 目录下的所有 `.jsonl` 文件，并生成一个名为 `dataset.jsonl` 的合并后的数据集。
+该脚本会自动处理 `./ts_repos` 目录下的所有 `callgraph.jsonl` 文件，并生成一个名为 `dataset.jsonl` 的合并后的数据集。
