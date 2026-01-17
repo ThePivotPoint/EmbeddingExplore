@@ -19,7 +19,7 @@ split_dataset_ratio: 0.05
 label_names: labels
 
 # Training args
-output_dir: output
+output_dir: /data/k8s/qzq/EmbeddingExplore/embedding_pipeline/output
 num_train_epochs: 1
 learning_rate: 6e-6
 gradient_accumulation_steps: 4

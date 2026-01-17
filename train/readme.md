@@ -1,0 +1,1 @@
+bash sft.sh > /data/k8s/qzq/EmbeddingExplore/embedding_pipeline/train/sft.log 2>&1 &
