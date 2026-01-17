@@ -44,7 +44,7 @@ python embedding_pipeline/download_ts_repos.py \
 下载完成后，使用 `extract_callgraphs.py` 脚本批量抽取调用图：
 
 ```bash
-python embedding_pipeline/extract_callgraphs.py --repos-dir ./ts_repos --out-dir ./callgraphs
+python embedding_pipeline/extract_callgraphs.py ./ts_repos
 ```
 
 该脚本会自动扫描 `--repos-dir` 目录下的所有 TypeScript 项目，并为每个项目生成一个 `.jsonl` 格式的调用图文件，存放在 `--out-dir` 目录中。
