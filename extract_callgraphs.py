@@ -7,6 +7,12 @@ from pathlib import Path
 from multiprocessing import Pool
 from tqdm import tqdm
 
+def _is_truthy_env(name: str) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return False
+    return val.strip().lower() in {"1", "true", "yes", "y", "on"}
+
 def run_extractor(repo_dir: Path):
     """
     Run the callgraph extractor on a single repository.
@@ -14,7 +20,7 @@ def run_extractor(repo_dir: Path):
     repo_name = repo_dir.name
     output_file = repo_dir / "callgraph.jsonl"
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    if output_file.exists():
+    if output_file.exists() and not _is_truthy_env("FORCE_REEXTRACT"):
         return f"Skipping {repo_name}, callgraph.jsonl already exists."
 
     tscompiler_dir = Path(__file__).resolve().parent / "tscompiler"

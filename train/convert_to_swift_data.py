@@ -2,7 +2,7 @@ import json
 import random
 from tqdm import tqdm
 
-def is_high_quality(code, min_chars=10, min_lines=3, max_lines=60):
+def is_high_quality(code, min_chars=10, min_lines=3, max_lines=40):
     """
     A simple heuristic to filter out low-quality code snippets.
     """
@@ -80,16 +80,17 @@ def main():
             if not is_high_quality(query) or not is_high_quality(positive):
                 continue
 
-            if query in seen_queries:
-                # if random.random() > 0.1:  # 10% chance to write a duplicate
+            if query in seen_queries or positive in seen_queries:
                 continue
             else:
                 seen_queries.add(query)
-
+                seen_queries.add(positive)
+            meta = data.get("meta") or {}
             # 转换为Swift格式
             swift_data = {
                 "messages": [{"role": "user", "content": QueryPrefix + query}],
                 "positive_messages": [[{"role": "user", "content": data["positive"]}]],
+                "meta": meta
             }
             f_out.write(json.dumps(swift_data, ensure_ascii=False) + "\n")
             lines_written += 1

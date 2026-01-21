@@ -15,15 +15,15 @@ python embedding_pipeline/download_ts_repos.py --n-repos 100 --min-stars 500 --o
 
 # 自定义筛选条件
 python embedding_pipeline/download_ts_repos.py \
-  --n-repos 50 \
-  --min-stars 1000 \
+  --n-repos 1000 \
+  --min-stars 500 \
   --created-after 2020-01-01 \
   --max-size-kb 100000 \
   --licenses mit apache-2.0 \
   --skip-forks \
   --skip-archived \
-  --out-dir ./high_quality_ts \
-  --save-urls ./high_quality_ts.txt
+  --out-dir ./ts_repos \
+  --save-urls ./ts_repos.txt
 ```
 
 该脚本功能：
@@ -44,7 +44,7 @@ python embedding_pipeline/download_ts_repos.py \
 下载完成后，使用 `extract_callgraphs.py` 脚本批量抽取调用图：
 
 ```bash
-python embedding_pipeline/extract_callgraphs.py ./ts_repos
+FORCE_REEXTRACT=1 python embedding_pipeline/extract_callgraphs.py ./ts_repos
 ```
 
 该脚本会自动扫描 `--repos-dir` 目录下的所有 TypeScript 项目，并为每个项目生成一个 `.jsonl` 格式的调用图文件，存放在 `--out-dir` 目录中。
@@ -56,4 +56,8 @@ python embedding_pipeline/extract_callgraphs.py ./ts_repos
 python embedding_pipeline/run_tscompiler_pipeline.py ./ts_repos --out ./dataset.jsonl
 ```
 
-该脚本会自动处理 `./ts_repos` 目录下的所有 `callgraph.jsonl` 文件，并生成一个名为 `dataset.jsonl` 的合并后的数据集。
+该脚本会自动处理 `./ts_repos` 目录下的所有 `callgraph.jsonl` 文件，并生成一个名为 `dataset.jsonl` 的合并后的数据集，同时生成一个均匀采样 500 行的 `dataset_sample500.jsonl`。
+
+数据字段说明：
+- `callgraph.jsonl`：每个函数节点包含 `calls`（兼容旧格式）以及可扩展的 `relations`（当前仅 `type=call`）
+- `dataset.jsonl`：每条样本包含 `relation_type`、`repo`，并在 `meta.repo` / `meta.type` 中保留关系与来源信息

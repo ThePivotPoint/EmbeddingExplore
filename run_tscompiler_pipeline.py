@@ -10,6 +10,30 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 
+def _write_uniform_sample(in_path: Path, out_path: Path, sample_size: int) -> int:
+    with open(in_path, "r", encoding="utf-8") as f:
+        total_lines = sum(1 for _ in f)
+
+    if total_lines == 0:
+        return 0
+
+    if total_lines <= sample_size:
+        with open(in_path, "r", encoding="utf-8") as f_in, open(out_path, "w", encoding="utf-8") as f_out:
+            for line in f_in:
+                f_out.write(line)
+        return total_lines
+
+    step = max(1, total_lines // sample_size)
+    written = 0
+    with open(in_path, "r", encoding="utf-8") as f_in, open(out_path, "w", encoding="utf-8") as f_out:
+        for i, line in enumerate(f_in):
+            if i % step == 0:
+                f_out.write(line)
+                written += 1
+                if written >= sample_size:
+                    break
+    return written
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -70,6 +94,14 @@ def main() -> None:
     temp_output.rename(args.out)
 
     print(f"\nDataset successfully built at: {args.out}")
+    sample_size = 500
+    if args.out.suffix == ".jsonl":
+        sample_out = args.out.with_suffix("")
+    else:
+        sample_out = args.out
+    sample_out = sample_out.with_name(sample_out.name + f"_sample{sample_size}.jsonl")
+    sampled = _write_uniform_sample(args.out, sample_out, sample_size)
+    print(f"Sample dataset built at: {sample_out} ({sampled} lines)")
 
 if __name__ == "__main__":
     main()

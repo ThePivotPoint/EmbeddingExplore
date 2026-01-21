@@ -74,6 +74,17 @@ def build_pairs(callgraph_jsonl: str, out_jsonl: str, with_negative: bool = True
     fns, rows = load_functions(callgraph_jsonl)
     by_file = build_index_by_file(fns)
     all_fns = list(fns.values())
+    repo_name = ""
+    for r in rows:
+        repo_name = r.get("repo") or ""
+        if repo_name:
+            break
+    if not repo_name:
+        callgraph_abs = os.path.abspath(callgraph_jsonl)
+        if os.path.basename(callgraph_abs) == "callgraph.jsonl":
+            repo_name = os.path.basename(os.path.dirname(callgraph_abs))
+        else:
+            repo_name = os.path.splitext(os.path.basename(callgraph_abs))[0]
 
     emitted = set()
     n = 0
@@ -92,29 +103,42 @@ def build_pairs(callgraph_jsonl: str, out_jsonl: str, with_negative: bool = True
             src_fn = fns.get(src_id)
             if not src_fn or not src_fn.code:
                 continue
-            for call in row.get("calls", []):
-                tgt_id = call.get("target_id")
+            relations = row.get("relations")
+            if relations is None:
+                relations = [{"type": "call", **c} for c in row.get("calls", [])]
+
+            for rel in relations:
+                rel_type = rel.get("type") or "unknown"
+                tgt_id = rel.get("target_id")
                 if not tgt_id:
                     continue
                 tgt_fn = fns.get(tgt_id)
                 if not tgt_fn or not tgt_fn.code:
                     continue
-                key = (src_id, tgt_id, call.get("expr", ""))
+                expr = rel.get("expr", "")
+                key = (repo_name, src_id, tgt_id, rel_type, expr)
                 if key in emitted:
                     continue
                 emitted.add(key)
 
+                meta = {
+                    "type": rel_type,
+                    "expr": expr,
+                    "repo": repo_name,
+                    "source_id": src_id,
+                    "target_id": tgt_id,
+                    "source_file": src_fn.file,
+                    "target_file": tgt_fn.file,
+                }
+                if rel_type == "call":
+                    meta["call"] = expr
+
                 payload = {
                     "query": src_fn.code,
                     "positive": tgt_fn.code,
-                    "meta": {
-                        "type": "call_relationship",
-                        "call": call.get("expr", ""),
-                        "source_id": src_id,
-                        "target_id": tgt_id,
-                        "source_file": src_fn.file,
-                        "target_file": tgt_fn.file,
-                    },
+                    "repo": repo_name,
+                    "relation_type": rel_type,
+                    "meta": meta,
                 }
                 if with_negative:
                     neg = pick_negative(src_fn, tgt_fn, by_file, all_fns)
@@ -138,4 +162,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

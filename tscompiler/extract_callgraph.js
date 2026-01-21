@@ -115,10 +115,11 @@ function shouldIncludeSourceFile(sf) {
   return true;
 }
 
-function collectFunctions(program, projectRoot) {
+function collectFunctions(program, rootDir, repoRoot) {
   const checker = program.getTypeChecker();
   const symbols = new Map();
   const declKeyToId = new Map();
+  const repo = path.basename(repoRoot);
 
   function addMapping(sf, declNode, id) {
     const key = `${path.resolve(sf.fileName)}:${declNode.getStart(sf)}:${declNode.getEnd()}`;
@@ -126,7 +127,7 @@ function collectFunctions(program, projectRoot) {
   }
 
   function record(sf, recordNode, declNodes, name, kind, container) {
-    const relFile = path.relative(projectRoot, sf.fileName);
+    const relFile = path.relative(rootDir, sf.fileName);
     const start = recordNode.getStart(sf);
     const end = recordNode.getEnd();
     const startLine = getLine(sf, start);
@@ -136,6 +137,7 @@ function collectFunctions(program, projectRoot) {
     const code = getNodeText(sf, recordNode);
     symbols.set(id, {
       id,
+      repo,
       name,
       kind,
       container,
@@ -146,6 +148,7 @@ function collectFunctions(program, projectRoot) {
       is_default_export: ef.isDefaultExport,
       code,
       calls: [],
+      relations: [],
     });
     for (const dn of declNodes) addMapping(sf, dn, id);
     return id;
@@ -206,24 +209,39 @@ function collectFunctions(program, projectRoot) {
     return ids;
   }
 
+  const relationExtractorFactories = [
+    ({ sf, fnId }) => ({
+      type: "call",
+      onNode(node, seen) {
+        if (!ts.isCallExpression(node)) return;
+        const exprText = node.expression.getText(sf);
+        const targets = resolveCallTargetIds(sf, node.expression);
+        for (const tid of targets) {
+          const k = `call::${exprText}::${tid}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          const fn = symbols.get(fnId);
+          if (!fn) continue;
+          fn.calls.push({ expr: exprText, target_id: tid });
+          fn.relations.push({ type: "call", expr: exprText, target_id: tid });
+        }
+      },
+    }),
+  ];
+
+  function getRelationExtractors(sf, fnId) {
+    return relationExtractorFactories.map((f) => f({ sf, fnId })).filter(Boolean);
+  }
+
   for (const sf of program.getSourceFiles()) {
     if (!shouldIncludeSourceFile(sf)) continue;
-    const relFile = path.relative(projectRoot, sf.fileName);
+    const relFile = path.relative(rootDir, sf.fileName);
 
-    function attachCalls(fnId, bodyNode) {
+    function attachRelations(fnId, bodyNode) {
       const seen = new Set();
+      const extractors = getRelationExtractors(sf, fnId);
       const walk = (node) => {
-        if (ts.isCallExpression(node)) {
-          const exprText = node.expression.getText(sf);
-          const targets = resolveCallTargetIds(sf, node.expression);
-          for (const tid of targets) {
-            const k = `${exprText}::${tid}`;
-            if (seen.has(k)) continue;
-            seen.add(k);
-            const fn = symbols.get(fnId);
-            if (fn) fn.calls.push({ expr: exprText, target_id: tid });
-          }
-        }
+        for (const ex of extractors) ex.onNode(node, seen);
         ts.forEachChild(node, walk);
       };
       ts.forEachChild(bodyNode, walk);
@@ -234,13 +252,13 @@ function collectFunctions(program, projectRoot) {
         const startLine = getLine(sf, node.getStart(sf));
         const endLine = getLine(sf, Math.max(node.getStart(sf), node.getEnd() - 1));
         const fnId = makeId(relFile, startLine, endLine, "function", node.name.text);
-        attachCalls(fnId, node.body);
+        attachRelations(fnId, node.body);
       } else if (ts.isMethodDeclaration(node) && node.body && node.name) {
         const name = node.name.getText(sf);
         const startLine = getLine(sf, node.getStart(sf));
         const endLine = getLine(sf, Math.max(node.getStart(sf), node.getEnd() - 1));
         const fnId = makeId(relFile, startLine, endLine, "method", name);
-        attachCalls(fnId, node.body);
+        attachRelations(fnId, node.body);
       } else if (ts.isVariableStatement(node)) {
         for (const decl of node.declarationList.declarations) {
           if (!ts.isIdentifier(decl.name)) continue;
@@ -250,7 +268,7 @@ function collectFunctions(program, projectRoot) {
           const startLine = getLine(sf, node.getStart(sf));
           const endLine = getLine(sf, Math.max(node.getStart(sf), node.getEnd() - 1));
           const fnId = makeId(relFile, startLine, endLine, "variable_function", name);
-          if (decl.initializer.body) attachCalls(fnId, decl.initializer.body);
+          if (decl.initializer.body) attachRelations(fnId, decl.initializer.body);
         }
       } else if (ts.isPropertyAssignment(node)) {
         const init = node.initializer;
@@ -259,7 +277,7 @@ function collectFunctions(program, projectRoot) {
           const startLine = getLine(sf, node.getStart(sf));
           const endLine = getLine(sf, Math.max(node.getStart(sf), node.getEnd() - 1));
           const fnId = makeId(relFile, startLine, endLine, "property_function", name);
-          if (init.body) attachCalls(fnId, init.body);
+          if (init.body) attachRelations(fnId, init.body);
         }
       }
       ts.forEachChild(node, visit);
@@ -286,9 +304,8 @@ function main() {
   }
   const projectRoot = path.resolve(args.project);
   const { program, rootDir } = createProgram(projectRoot);
-  const records = collectFunctions(program, rootDir);
+  const records = collectFunctions(program, rootDir, projectRoot);
   writeJsonl(records, args.out);
 }
 
 main();
-
