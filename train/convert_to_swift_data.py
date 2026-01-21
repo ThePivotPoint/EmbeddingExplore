@@ -81,8 +81,8 @@ def main():
                 continue
 
             if query in seen_queries:
-                if random.random() > 0.1:  # 10% chance to write a duplicate
-                    continue
+                # if random.random() > 0.1:  # 10% chance to write a duplicate
+                continue
             else:
                 seen_queries.add(query)
 
